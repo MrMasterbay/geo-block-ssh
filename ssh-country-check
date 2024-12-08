@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# Log function
+log() {
+    echo "$(date): $1" >> /var/log/ssh_check.log
+}
+
+# Get the client IP
+CLIENT_IP=$(echo $SSH_CLIENT | awk '{print $1}')
+log "New connection attempt from IP: $CLIENT_IP"
+
+# Define allowed IPs
+ALLOWED_IPS=("IP1" "IP2")
+
+# Check if it's a Cluster IP
+for ip in "${ALLOWED_IPS[@]}"; do
+    log "Checking against allowed IP: $ip"
+    if [[ "$CLIENT_IP" == "$ip" ]]; then
+        log "Matched allowed IP - granting access"
+        # Instead of exit 0, we'll continue to shell
+        /bin/bash
+        exit
+    fi
+done
+
+# Country check
+WHOIS_OUTPUT=$(whois $CLIENT_IP 2>&1)
+COUNTRY=$(echo "$WHOIS_OUTPUT" | grep -i "country:" | awk '{print $2}' | head -n 1)
+log "Detected country: $COUNTRY"
+
+if [[ "$COUNTRY" != "YOURCOUNTRY1" && "$COUNTRY" != "YOURCOUNTRY2" ]]; then
+    log "Access granted for COUNTRY IPs"
+    # Launch shell instead of just exiting
+    /bin/bash
+    exit
+else
+    log "Access denied: Not from COUNTRY IPs and not in allowed IPs"
+    echo "Access denied: Connection not authorized" >&2
+    sleep 1
+    exit 1
+fi
